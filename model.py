@@ -159,11 +159,12 @@ class EncodecModel(nn.Module):
             scale = None
 
         emb = self.encoder(x) # [2,1,10000] -> [2,128,32]
+        codes = emb
         #TODO: Encodec Trainer的training
-        if self.training:
-            return emb,scale
-        codes = self.quantizer.encode(emb, self.frame_rate, self.bandwidth)
-        codes = codes.transpose(0, 1)
+        # if self.training:
+            # return emb,scale
+        # codes = self.quantizer.encode(emb, self.frame_rate, self.bandwidth)
+        # codes = codes.transpose(0, 1)
         # codes is [B, K, T], with T frames, K nb of codebooks.
         return codes, scale
 
@@ -182,11 +183,11 @@ class EncodecModel(nn.Module):
 
     def _decode_frame(self, encoded_frame: EncodedFrame) -> torch.Tensor:
         codes, scale = encoded_frame
-        if self.training:
-            emb = codes
-        else:
-            codes = codes.transpose(0, 1)
-            emb = self.quantizer.decode(codes)
+        # if self.training:
+        emb = codes
+        # else:
+            # codes = codes.transpose(0, 1)
+            # emb = self.quantizer.decode(codes)
         out = self.decoder(emb)
         if scale is not None:
             out = out * scale.view(-1, 1, 1)
