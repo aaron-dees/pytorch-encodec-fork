@@ -1,5 +1,5 @@
 #!/bin/sh
-#SBATCH --job-name=encodec_train
+#SBATCH --job-name=vae_encodec
 #SBATCH --cpus-per-task=10
 #SBATCH --gres=gpu:1
 #SBATCH --mem=16G
@@ -13,7 +13,7 @@ python train_multi_gpu.py \
         distributed.data_parallel=False \
         common.save_interval=5000 \
         common.test_interval=100\
-        common.max_epoch=20000 \
+        common.max_epoch=10000 \
         common.log_interval=1000 \
         datasets.tensor_cut=48_000 \
         datasets.batch_size=16 \

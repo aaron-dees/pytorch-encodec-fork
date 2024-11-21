@@ -21,7 +21,7 @@ import random
 
 ROOT_URL = 'https://dl.fbaipublicfiles.com/encodec/v0/'
 
-EncodedFrame = tp.Tuple[torch.Tensor, tp.Optional[torch.Tensor]]
+EncodedFrame = tp.Tuple[torch.Tensor, tp.Optional[torch.Tensor], tp.Optional[torch.Tensor], tp.Optional[torch.Tensor]]
 
 
 class LMModel(nn.Module):
@@ -158,7 +158,7 @@ class EncodecModel(nn.Module):
         else:
             scale = None
 
-        emb = self.encoder(x) # [2,1,10000] -> [2,128,32]
+        emb, mu, logvar = self.encoder(x) # [2,1,10000] -> [2,128,32]
         codes = emb
         #TODO: Encodec Trainer的training
         # if self.training:
@@ -166,7 +166,7 @@ class EncodecModel(nn.Module):
         # codes = self.quantizer.encode(emb, self.frame_rate, self.bandwidth)
         # codes = codes.transpose(0, 1)
         # codes is [B, K, T], with T frames, K nb of codebooks.
-        return codes, scale
+        return codes, scale, mu, logvar
 
     def decode(self, encoded_frames: tp.List[EncodedFrame]) -> torch.Tensor:
         """Decode the given frames into a waveform.
@@ -177,12 +177,11 @@ class EncodecModel(nn.Module):
         if segment_length is None:
             assert len(encoded_frames) == 1
             return self._decode_frame(encoded_frames[0])
-
         frames = [self._decode_frame(frame) for frame in encoded_frames]
         return _linear_overlap_add(frames, self.segment_stride or 1)
 
     def _decode_frame(self, encoded_frame: EncodedFrame) -> torch.Tensor:
-        codes, scale = encoded_frame
+        codes, scale, _, _ = encoded_frame
         # if self.training:
         emb = codes
         # else:

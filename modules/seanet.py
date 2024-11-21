@@ -158,13 +158,14 @@ class SEANetEncoder(nn.Module):
     def forward(self, x):
         
         h = self.model(x)
-        # h = h.permute(0,2,1)
-        # mu = self.Dense_E_1(h)
-        # logvar = self.Dense_E_1(h)
-        # z = sample_from_distribution(mu, logvar)
+        h = h.permute(0,2,1)
+        mu = self.Dense_E_1(h)
+        logvar = self.Dense_E_1(h)
+        z = sample_from_distribution(mu, logvar)
+        z = h.permute(0,2,1)
 
-        # return z, mu, logvar
-        return h
+        return z, mu, logvar
+        # return h
 
 
 class SEANetDecoder(nn.Module):

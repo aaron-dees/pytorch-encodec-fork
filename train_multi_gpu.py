@@ -28,8 +28,40 @@ warnings.filterwarnings("ignore")
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
+def compute_kld(mu, logvar):
+    # print("Pre: ", mu.shape)
+
+    mu = torch.flatten(mu, start_dim=1)
+    logvar = torch.flatten(logvar, start_dim=1)
+
+    # print("After: ", mu.shape)
+
+    kld_loss = torch.mean(-0.5 * torch.sum(1 + logvar - mu ** 2 - logvar.exp(), dim = 1), dim = 0)
+
+    return kld_loss
+
+def init_beta(max_steps,tar_beta,beta_steps=1000, warmup_perc=0.1):
+    # if continue_training:
+    #     beta = tar_beta
+    #     print("\n*** setting fixed beta of ",beta)
+    # else:
+    # warmup wihtout increasing beta
+    warmup_start = int(warmup_perc*max_steps)
+    # set beta steps to only increase of half of max steps
+    beta_step_size = int(max_steps/2/beta_steps)
+    beta_step_val = tar_beta/beta_steps
+    beta = 0
+    print("--- Initialising Beta, from 0 to ", tar_beta)
+    print("")
+    print('--- Beta: {}'.format(beta),
+            '\tWarmup Start: {}'.format(warmup_start),
+            '\tStep Size: {}'.format(beta_step_size),
+            '\tStep Val: {:.5f}'.format(beta_step_val))
+        
+    return beta, beta_step_val, beta_step_size, warmup_start
+
 # Define train one step function
-def train_one_step(epoch,optimizer,optimizer_disc, model, disc_model, trainloader,config,scheduler,disc_scheduler,scaler=None,scaler_disc=None,writer=None,balancer=None):
+def train_one_step(epoch,optimizer,optimizer_disc, model, disc_model, trainloader,config,scheduler,disc_scheduler,beta,scaler=None,scaler_disc=None,writer=None,balancer=None):
     """train one step function
 
     Args:
@@ -57,8 +89,28 @@ def train_one_step(epoch,optimizer,optimizer_disc, model, disc_model, trainloade
         # warmup learning rate, warmup_epoch is defined in config file,default is 5
         input_wav = input_wav.contiguous().cuda() #[B, 1, T]: eg. [2, 1, 203760]
         optimizer.zero_grad()
+
         with autocast(enabled=config.common.amp):
-            output, _, _ = model(input_wav) #output: [B, 1, T]: eg. [2, 1, 203760] | loss_w: [1] 
+            output, _, frames = model(input_wav) #output: [B, 1, T]: eg. [2, 1, 203760] | loss_w: [1] 
+
+            # Get mu and logvar for VAE training
+            _,_,mu_tmp,logvar_tmp = frames[0]
+            mu = mu_tmp
+            logvar = logvar_tmp
+            for i in range(1,len(frames)):
+                _,_,mu_tmp,logvar_tmp = frames[i]
+                mu = torch.cat((mu, mu_tmp), dim = -2)
+                logvar = torch.cat((logvar, logvar_tmp), dim = -2)
+
+            # Reshape mu and logvar so average is taken across 
+            mu = mu.reshape(mu.shape[0]*mu.shape[1], mu.shape[2])
+            logvar = logvar.reshape(logvar.shape[0]*logvar.shape[1], logvar.shape[2])
+            # kld_loss = torch.tensor([0.0], device=input_wav.device, requires_grad=True)
+            # if beta > 0:
+            kld_loss = compute_kld(mu, logvar) * beta
+                # kld_loss = 0
+
+
             logits_real, fmap_real = disc_model(input_wav)
             logits_fake, fmap_fake = disc_model(output)
             losses_g = total_loss(
@@ -69,8 +121,17 @@ def train_one_step(epoch,optimizer,optimizer_disc, model, disc_model, trainloade
                 output, 
                 sample_rate=config.model.sample_rate,
             ) 
+
+            # losses_g['l_kld'] = kld_loss
+
+            # print("Loss g: ", losses_g['l_g'].shape)
+            # print("Loss feat: ", losses_g['l_feat'].shape)
+            # print("Loss t: ", losses_g['l_t'].shape)
+            # print("Loss g: ", losses_g['l_f'].shape)
+
         if config.common.amp: 
-            loss = 3*losses_g['l_g'] + 3*losses_g['l_feat'] + losses_g['l_t']/10 + losses_g['l_f']  
+            # loss = 3*losses_g['l_g'] + 3*losses_g['l_feat'] + losses_g['l_t']/10 + losses_g['l_f'] +
+            loss = 3*losses_g['l_g'] + 3*losses_g['l_feat'] + losses_g['l_t']/10 + losses_g['l_f'] + losses_g['l_kld']
             # not implementing loss balancer in this section, since they say amp is not working anyway:
             # https://github.com/ZhikangNiu/encodec-pytorch/issues/21#issuecomment-2122593367
             scaler.scale(loss).backward()  
@@ -86,10 +147,13 @@ def train_one_step(epoch,optimizer,optimizer_disc, model, disc_model, trainloade
                 balancer.backward(losses_g, output, retain_graph=True)
                 # naive loss summation for metrics below
                 loss_g = sum([l * balancer.weights[k] for k, l in losses_g.items()])
+                # What is the effect of this?
+                kld_loss.backward()
             else:
                 # without balancer: loss = 3*l_g + 3*l_feat + (l_t / 10) + l_f
                 # loss_g = torch.tensor([0.0], device='cuda', requires_grad=True)
-                loss_g = 3*losses_g['l_g'] + 3*losses_g['l_feat'] + losses_g['l_t']/10 + losses_g['l_f'] 
+                # loss_g = 3*losses_g['l_g'] + 3*losses_g['l_feat'] + losses_g['l_t']/10 + losses_g['l_f'] 
+                loss_g = 3*losses_g['l_g'] + 3*losses_g['l_feat'] + losses_g['l_t']/10 + losses_g['l_f'] + losses_g['l_kld']
                 loss_g.backward()
             # loss_w.backward()
             optimizer.step()
@@ -140,6 +204,7 @@ def train_one_step(epoch,optimizer,optimizer_disc, model, disc_model, trainloade
                 log_msg += f"loss_disc: {accumulated_loss_disc / (idx + 1) :.4f}"  
                 writer.add_scalar('Train/Loss_Disc', accumulated_loss_disc / (idx + 1), (epoch-1) * len(trainloader) + idx) 
             logger.info(log_msg) 
+            logger.info(f"Beta: {beta} \tKLD Loss: {kld_loss}")
 
 @torch.no_grad()
 def test(epoch, model, disc_model, testloader, config, writer):
@@ -336,11 +401,32 @@ def train(local_rank,world_size,config,tmp_file=None):
     if balancer:
         logger.info(f'Loss balancer with weights {balancer.weights} instantiated')
     # test(0, model, disc_model, testloader, config, writer)
+
+    BETA_WARMUP_START_PERC = 0.1
+    TARGET_BETA = 0.0001
+    # number of warmup steps over half max_steps
+    BETA_STEPS = 250
+
+    beta, beta_step_val, beta_step_size, warmup_start = init_beta(config.common.max_epoch, TARGET_BETA, BETA_STEPS, BETA_WARMUP_START_PERC)
+
+    logger.info(f"Beta step val: {beta_step_val}, \tWarmup: {warmup_start}")
+    
     for epoch in range(start_epoch, config.common.max_epoch+1):
+
+        # increment beta
+        if (epoch+1)%beta_step_size==0:
+            if epoch<warmup_start:
+                beta = 0
+            elif beta<TARGET_BETA:
+                beta += beta_step_val
+                beta = np.min([beta,TARGET_BETA])
+            else:
+                beta = TARGET_BETA
+
         train_one_step(
             epoch, optimizer, optimizer_disc, 
             model, disc_model, trainloader,config,
-            scheduler,disc_scheduler,scaler,scaler_disc,writer,balancer)
+            scheduler,disc_scheduler,beta,scaler,scaler_disc,writer,balancer)
         if epoch % config.common.test_interval == 0:
             test(epoch,model,disc_model,testloader,config,writer)
         # save checkpoint and epoch
