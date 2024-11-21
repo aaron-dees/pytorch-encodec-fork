@@ -14,7 +14,7 @@ import numpy as np
 import torch
 from torch import nn
 
-import quantization as qt
+# import quantization as qt
 import modules as m
 from utils import _check_checksum, _linear_overlap_add, _get_checkpoint_url
 import random
@@ -81,7 +81,7 @@ class EncodecModel(nn.Module):
     def __init__(self,
                  encoder: m.SEANetEncoder,
                  decoder: m.SEANetDecoder,
-                 quantizer: qt.ResidualVectorQuantizer,
+                #  quantizer: qt.ResidualVectorQuantizer,
                  target_bandwidths: tp.List[float],
                  sample_rate: int,
                  channels: int,
@@ -93,7 +93,7 @@ class EncodecModel(nn.Module):
         self.bandwidth: tp.Optional[float] = None
         self.target_bandwidths = target_bandwidths
         self.encoder = encoder
-        self.quantizer = quantizer
+        # self.quantizer = quantizer
         self.decoder = decoder
         self.sample_rate = sample_rate
         self.channels = channels
@@ -102,9 +102,9 @@ class EncodecModel(nn.Module):
         self.overlap = overlap
         self.frame_rate = math.ceil(self.sample_rate / np.prod(self.encoder.ratios)) #75
         self.name = name
-        self.bits_per_codebook = int(math.log2(self.quantizer.bins))
-        assert 2 ** self.bits_per_codebook == self.quantizer.bins, \
-            "quantizer bins must be a power of 2."
+        # self.bits_per_codebook = int(math.log2(self.quantizer.bins))
+        # assert 2 ** self.bits_per_codebook == self.quantizer.bins, \
+            # "quantizer bins must be a power of 2."
 
     @property
     def segment_length(self) -> tp.Optional[int]:
@@ -204,11 +204,12 @@ class EncodecModel(nn.Module):
             if torch.distributed.is_initialized():
                 torch.distributed.broadcast(index, src=0)
             bw = self.target_bandwidths[index.item()]# fixme: variable bandwidth training, if you broadcast bd, the broadcast will encounter error
-            for emb,scale in frames:
-                qv = self.quantizer(emb,self.frame_rate,bw)
-                loss_w = loss_w + qv.penalty # loss_w is the sum of all quantizer forward loss (RVQ commitment loss :l_w)
-                codes.append((qv.quantized,scale))
-            return self.decode(codes)[:,:,:x.shape[-1]],loss_w,frames
+            # for emb,scale in frames:
+                # qv = self.quantizer(emb,self.frame_rate,bw)
+                # loss_w = loss_w + qv.penalty # loss_w is the sum of all quantizer forward loss (RVQ commitment loss :l_w)
+                # codes.append((qv.quantized,scale))
+            # return self.decode(codes)[:,:,:x.shape[-1]],loss_w,frames
+            return self.decode(frames)[:,:,:x.shape[-1]],loss_w,frames
         else:
             # if encodec is not training, input_wav -> encoder -> quantizer encode -> decode
             return self.decode(frames)[:, :, :x.shape[-1]]
@@ -219,26 +220,26 @@ class EncodecModel(nn.Module):
                              f"Select one of {self.target_bandwidths}.")
         self.bandwidth = bandwidth
 
-    def get_lm_model(self) -> LMModel:
-        """Return the associated LM model to improve the compression rate.
-        """
-        device = next(self.parameters()).device
-        lm = LMModel(self.quantizer.n_q, self.quantizer.bins, num_layers=5, dim=200,
-                     past_context=int(3.5 * self.frame_rate)).to(device)
-        checkpoints = {
-            'encodec_24khz': 'encodec_lm_24khz-1608e3c0.th',
-            'encodec_48khz': 'encodec_lm_48khz-7add9fc3.th',
-        }
-        try:
-            checkpoint_name = checkpoints[self.name]
-        except KeyError:
-            raise RuntimeError("No LM pre-trained for the current Encodec model.")
-        url = _get_checkpoint_url(ROOT_URL, checkpoint_name)
-        state = torch.hub.load_state_dict_from_url(
-            url, map_location='cpu', check_hash=True)  # type: ignore
-        lm.load_state_dict(state)
-        lm.eval()
-        return lm
+    # def get_lm_model(self) -> LMModel:
+    #     """Return the associated LM model to improve the compression rate.
+    #     """
+    #     device = next(self.parameters()).device
+    #     # lm = LMModel(self.quantizer.n_q, self.quantizer.bins, num_layers=5, dim=200,
+    #                 #  past_context=int(3.5 * self.frame_rate)).to(device)
+    #     checkpoints = {
+    #         'encodec_24khz': 'encodec_lm_24khz-1608e3c0.th',
+    #         'encodec_48khz': 'encodec_lm_48khz-7add9fc3.th',
+    #     }
+    #     try:
+    #         checkpoint_name = checkpoints[self.name]
+    #     except KeyError:
+    #         raise RuntimeError("No LM pre-trained for the current Encodec model.")
+    #     url = _get_checkpoint_url(ROOT_URL, checkpoint_name)
+    #     state = torch.hub.load_state_dict_from_url(
+    #         url, map_location='cpu', check_hash=True)  # type: ignore
+    #     lm.load_state_dict(state)
+    #     lm.eval()
+    #     return lm
 
     @staticmethod
     def _get_model(target_bandwidths: tp.List[float],
@@ -253,15 +254,15 @@ class EncodecModel(nn.Module):
         encoder = m.SEANetEncoder(channels=channels, norm=model_norm, causal=causal,ratios=ratios)
         decoder = m.SEANetDecoder(channels=channels, norm=model_norm, causal=causal,ratios=ratios)
         n_q = int(1000 * target_bandwidths[-1] // (math.ceil(sample_rate / encoder.hop_length) * 10)) # int(1000*24//(math.ceil(24000/320)*10))
-        quantizer = qt.ResidualVectorQuantizer(
-            dimension=encoder.dimension,
-            n_q=n_q,
-            bins=1024,
-        )
+        # quantizer = qt.ResidualVectorQuantizer(
+        #     dimension=encoder.dimension,
+        #     n_q=n_q,
+        #     bins=1024,
+        # )
         model = EncodecModel(
             encoder,
             decoder,
-            quantizer,
+            # quantizer,
             target_bandwidths,
             sample_rate,
             channels,

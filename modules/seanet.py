@@ -10,6 +10,7 @@ import typing as tp
 
 import numpy as np
 import torch.nn as nn
+import torch
 
 from . import (
     SConv1d,
@@ -17,6 +18,17 @@ from . import (
     SLSTM
 )
 
+# Sample from a gaussian distribution
+def sample_from_distribution(mu, log_variance):
+
+    # point = mu + sigma*sample(N(0,1))
+    
+    std = torch.exp(log_variance * 0.5)
+    # epsilon = torch.normal(torch.zeros(shape).to(device), torch.ones(shape).to(device))
+    epsilon = torch.randn_like(std)
+    sampled_point = mu + std * epsilon
+
+    return sampled_point
 
 class SEANetResnetBlock(nn.Module):
     """Residual block from SEANet model.
@@ -140,8 +152,19 @@ class SEANetEncoder(nn.Module):
 
         self.model = nn.Sequential(*model)
 
+        self.Dense_E_1 = nn.Linear(dimension, dimension)
+        
+
     def forward(self, x):
-        return self.model(x)
+        
+        h = self.model(x)
+        # h = h.permute(0,2,1)
+        # mu = self.Dense_E_1(h)
+        # logvar = self.Dense_E_1(h)
+        # z = sample_from_distribution(mu, logvar)
+
+        # return z, mu, logvar
+        return h
 
 
 class SEANetDecoder(nn.Module):

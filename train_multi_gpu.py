@@ -50,7 +50,7 @@ def train_one_step(epoch,optimizer,optimizer_disc, model, disc_model, trainloade
     # Initialize variables to accumulate losses  
     accumulated_loss_g = 0.0
     accumulated_losses_g = defaultdict(float)
-    accumulated_loss_w = 0.0
+    # accumulated_loss_w = 0.0
     accumulated_loss_disc = 0.0
 
     for idx,input_wav in enumerate(trainloader):
@@ -58,7 +58,7 @@ def train_one_step(epoch,optimizer,optimizer_disc, model, disc_model, trainloade
         input_wav = input_wav.contiguous().cuda() #[B, 1, T]: eg. [2, 1, 203760]
         optimizer.zero_grad()
         with autocast(enabled=config.common.amp):
-            output, loss_w, _ = model(input_wav) #output: [B, 1, T]: eg. [2, 1, 203760] | loss_w: [1] 
+            output, _, _ = model(input_wav) #output: [B, 1, T]: eg. [2, 1, 203760] | loss_w: [1] 
             logits_real, fmap_real = disc_model(input_wav)
             logits_fake, fmap_fake = disc_model(output)
             losses_g = total_loss(
@@ -70,7 +70,7 @@ def train_one_step(epoch,optimizer,optimizer_disc, model, disc_model, trainloade
                 sample_rate=config.model.sample_rate,
             ) 
         if config.common.amp: 
-            loss = 3*losses_g['l_g'] + 3*losses_g['l_feat'] + losses_g['l_t']/10 + losses_g['l_f']  + loss_w
+            loss = 3*losses_g['l_g'] + 3*losses_g['l_feat'] + losses_g['l_t']/10 + losses_g['l_f']  
             # not implementing loss balancer in this section, since they say amp is not working anyway:
             # https://github.com/ZhikangNiu/encodec-pytorch/issues/21#issuecomment-2122593367
             scaler.scale(loss).backward()  
@@ -91,14 +91,14 @@ def train_one_step(epoch,optimizer,optimizer_disc, model, disc_model, trainloade
                 # loss_g = torch.tensor([0.0], device='cuda', requires_grad=True)
                 loss_g = 3*losses_g['l_g'] + 3*losses_g['l_feat'] + losses_g['l_t']/10 + losses_g['l_f'] 
                 loss_g.backward()
-            loss_w.backward()
+            # loss_w.backward()
             optimizer.step()
 
         # Accumulate losses  
         accumulated_loss_g += loss_g.item()
         for k, l in losses_g.items():
             accumulated_losses_g[k] += l.item()
-        accumulated_loss_w += loss_w.item()
+        # accumulated_loss_w += loss_w.item()
 
         # only update discriminator with probability from paper (configure)
         optimizer_disc.zero_grad()
@@ -130,12 +130,12 @@ def train_one_step(epoch,optimizer,optimizer_disc, model, disc_model, trainloade
 
         if (not config.distributed.data_parallel or dist.get_rank() == 0) and (idx % config.common.log_interval == 0 or idx == data_length - 1): 
             log_msg = (  
-                f"Epoch {epoch} {idx+1}/{data_length}\tAvg loss_G: {accumulated_loss_g / (idx + 1):.4f}\tAvg loss_W: {accumulated_loss_w / (idx + 1):.4f}\tlr_G: {optimizer.param_groups[0]['lr']:.6e}\tlr_D: {optimizer_disc.param_groups[0]['lr']:.6e}\t"  
+                f"Epoch {epoch} {idx+1}/{data_length}\tAvg loss_G: {accumulated_loss_g / (idx + 1):.4f}\tlr_G: {optimizer.param_groups[0]['lr']:.6e}\tlr_D: {optimizer_disc.param_groups[0]['lr']:.6e}\t"  
             ) 
             writer.add_scalar('Train/Loss_G', accumulated_loss_g / (idx + 1), (epoch-1) * len(trainloader) + idx)  
             for k, l in accumulated_losses_g.items():
                 writer.add_scalar(f'Train/{k}', l / (idx + 1), (epoch-1) * len(trainloader) + idx)
-            writer.add_scalar('Train/Loss_W', accumulated_loss_w / (idx + 1), (epoch-1) * len(trainloader) + idx) 
+            # writer.add_scalar('Train/Loss_W', accumulated_loss_w / (idx + 1), (epoch-1) * len(trainloader) + idx) 
             if config.model.train_discriminator and epoch >= config.lr_scheduler.warmup_epoch:
                 log_msg += f"loss_disc: {accumulated_loss_disc / (idx + 1) :.4f}"  
                 writer.add_scalar('Train/Loss_Disc', accumulated_loss_disc / (idx + 1), (epoch-1) * len(trainloader) + idx) 
@@ -220,7 +220,8 @@ def train(local_rank,world_size,config,tmp_file=None):
     logger.info(disc_model)
     logger.info(config)
     logger.info(f"Encodec Model Parameters: {count_parameters(model)} | Disc Model Parameters: {count_parameters(disc_model)}")
-    logger.info(f"model train mode :{model.training} | quantizer train mode :{model.quantizer.training} ")
+    # logger.info(f"model train mode :{model.training} | quanmizer train mode :{model.quantizer.training} ")
+    logger.info(f"model train mode :{model.training} ")
 
     # resume training
     resume_epoch = 0
