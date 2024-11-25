@@ -12,6 +12,7 @@ import torch.optim as optim
 from torch.cuda.amp import GradScaler, autocast
 from torch.utils.tensorboard import SummaryWriter
 import torchaudio
+import numpy as np
 
 import customAudioDataset as data
 from customAudioDataset import collate_fn
@@ -204,7 +205,7 @@ def train_one_step(epoch,optimizer,optimizer_disc, model, disc_model, trainloade
                 log_msg += f"loss_disc: {accumulated_loss_disc / (idx + 1) :.4f}"  
                 writer.add_scalar('Train/Loss_Disc', accumulated_loss_disc / (idx + 1), (epoch-1) * len(trainloader) + idx) 
             logger.info(log_msg) 
-            logger.info(f"Beta: {beta} \tKLD Loss: {kld_loss}")
+            logger.info(f"Beta: {beta} \tKLD Loss: {kld_loss:.16f}")
 
 @torch.no_grad()
 def test(epoch, model, disc_model, testloader, config, writer):
@@ -403,13 +404,15 @@ def train(local_rank,world_size,config,tmp_file=None):
     # test(0, model, disc_model, testloader, config, writer)
 
     BETA_WARMUP_START_PERC = 0.1
-    TARGET_BETA = 0.0001
+    # BETA_WARMUP_START_PERC = 0.001
+    TARGET_BETA = 0.01
     # number of warmup steps over half max_steps
     BETA_STEPS = 250
+    # BETA_STEPS = 250
 
     beta, beta_step_val, beta_step_size, warmup_start = init_beta(config.common.max_epoch, TARGET_BETA, BETA_STEPS, BETA_WARMUP_START_PERC)
 
-    logger.info(f"Beta step val: {beta_step_val}, \tWarmup: {warmup_start}")
+    logger.info(f"Target Beta: {TARGET_BETA} \tBeta step val: {beta_step_val}, \tWarmup: {warmup_start}")
     
     for epoch in range(start_epoch, config.common.max_epoch+1):
 
