@@ -211,7 +211,7 @@ class EncodecModel(nn.Module):
             return self.decode(frames)[:,:,:x.shape[-1]],loss_w,frames
         else:
             # if encodec is not training, input_wav -> encoder -> quantizer encode -> decode
-            return self.decode(frames)[:, :, :x.shape[-1]]
+            return self.decode(frames)[:, :, :x.shape[-1]], frames
 
     def set_target_bandwidth(self, bandwidth: float):
         if bandwidth not in self.target_bandwidths:
