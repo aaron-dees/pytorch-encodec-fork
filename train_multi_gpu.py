@@ -213,7 +213,7 @@ def test(epoch, model, disc_model, testloader, config, writer):
     for idx, input_wav in enumerate(testloader):
         input_wav = input_wav.cuda()
 
-        output = model(input_wav)
+        output, frames = model(input_wav)
         logits_real, fmap_real = disc_model(input_wav)
         logits_fake, fmap_fake = disc_model(output)
         loss_disc = disc_loss(logits_real, logits_fake) # compute discriminator loss
@@ -229,7 +229,8 @@ def test(epoch, model, disc_model, testloader, config, writer):
         # save a sample reconstruction (not cropped)
         input_wav, _ = testloader.dataset.get()
         input_wav = input_wav.cuda()
-        output = model(input_wav.unsqueeze(0)).squeeze(0)
+        output, frames = model(input_wav.unsqueeze(0))
+        output = output.squeeze(0)
         # summarywriter can't log stereo files 😅 so just save examples
         sp = Path(config.checkpoint.save_folder)
         torchaudio.save(sp/f'GT.wav', input_wav.cpu(), config.model.sample_rate)
