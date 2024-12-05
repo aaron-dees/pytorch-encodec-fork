@@ -28,10 +28,10 @@ def total_loss(fmap_real, logits_fake, fmap_fake, input_wav, output_wav, sample_
     # l_f - linear combination between the L1 and L2 losses over the mel-spectrogram using several time scales
     # l_g - adversarial loss for the generator
     # l_feat - relative feature matching loss for the generator
-    l_t = torch.tensor([0.0], device='cuda', requires_grad=True)
-    l_f = torch.tensor([0.0], device='cuda', requires_grad=True)
-    l_g = torch.tensor([0.0], device='cuda', requires_grad=True)
-    l_feat = torch.tensor([0.0], device='cuda', requires_grad=True)
+    l_t = torch.tensor([0.0], device='cpu', requires_grad=True)
+    l_f = torch.tensor([0.0], device='cpu', requires_grad=True)
+    l_g = torch.tensor([0.0], device='cpu', requires_grad=True)
+    l_feat = torch.tensor([0.0], device='cpu', requires_grad=True)
 
     #time domain loss, output_wav is the output of the generator
     l_t = l1Loss(input_wav, output_wav) 
@@ -73,7 +73,7 @@ def disc_loss(logits_real, logits_fake):
         lossd: discriminator loss
     """
     relu = torch.nn.ReLU()
-    lossd = torch.tensor([0.0], device='cuda', requires_grad=True)
+    lossd = torch.tensor([0.0], device='cpu', requires_grad=True)
     for tt1 in range(len(logits_real)):
         lossd = lossd + torch.mean(relu(1-logits_real[tt1])) + torch.mean(relu(1+logits_fake[tt1]))
     lossd = lossd / len(logits_real)

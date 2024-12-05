@@ -88,7 +88,7 @@ def train_one_step(epoch,optimizer,optimizer_disc, model, disc_model, trainloade
 
     for idx,input_wav in enumerate(trainloader):
         # warmup learning rate, warmup_epoch is defined in config file,default is 5
-        input_wav = input_wav.contiguous().cuda() #[B, 1, T]: eg. [2, 1, 203760]
+        input_wav = input_wav.contiguous().cpu() #[B, 1, T]: eg. [2, 1, 203760]
         optimizer.zero_grad()
 
         with autocast(enabled=config.common.amp):
@@ -169,7 +169,7 @@ def train_one_step(epoch,optimizer,optimizer_disc, model, disc_model, trainloade
         optimizer_disc.zero_grad()
         train_discriminator = torch.BoolTensor([config.model.train_discriminator 
                                and epoch >= config.lr_scheduler.warmup_epoch 
-                               and random.random() < float(config.model.train_discriminator)]).cuda()
+                               and random.random() < float(config.model.train_discriminator)]).cpu()
         # fix https://github.com/ZhikangNiu/encodec-pytorch/issues/30
         if dist.is_initialized():
             dist.broadcast(train_discriminator, 0)
@@ -211,7 +211,7 @@ def train_one_step(epoch,optimizer,optimizer_disc, model, disc_model, trainloade
 def test(epoch, model, disc_model, testloader, config, writer):
     model.eval()
     for idx, input_wav in enumerate(testloader):
-        input_wav = input_wav.cuda()
+        input_wav = input_wav.cpu()
 
         output = model(input_wav)
         logits_real, fmap_real = disc_model(input_wav)
@@ -228,7 +228,7 @@ def test(epoch, model, disc_model, testloader, config, writer):
 
         # save a sample reconstruction (not cropped)
         input_wav, _ = testloader.dataset.get()
-        input_wav = input_wav.cuda()
+        input_wav = input_wav.cpu()
         output = model(input_wav.unsqueeze(0)).squeeze(0)
         # summarywriter can't log stereo files 😅 so just save examples
         sp = Path(config.checkpoint.save_folder)
@@ -333,14 +333,14 @@ def train(local_rank,world_size,config,tmp_file=None):
                 rank=local_rank,
                 world_size=world_size)
 
-        torch.cuda.set_device(local_rank) 
-        torch.cuda.empty_cache()
+        # torch.cuda.set_device(local_rank) 
+        # torch.cuda.empty_cache()
         # set distributed sampler
         train_sampler = torch.utils.data.distributed.DistributedSampler(trainset)
         test_sampler = torch.utils.data.distributed.DistributedSampler(testset)
 
-    model.cuda()
-    disc_model.cuda()
+    model.cpu()
+    disc_model.cpu()
 
     trainloader = torch.utils.data.DataLoader(
         trainset,
