@@ -260,6 +260,8 @@ def train(local_rank,world_size,config,tmp_file=None):
         set_seed(config.common.seed)
 
     # set train dataset
+    # trainset = data.CustomAudioDataset_FSD(config=config)
+    # testset = data.CustomAudioDataset_FSD(config=config,mode='test')
     trainset = data.CustomAudioDataset(config=config)
     testset = data.CustomAudioDataset(config=config,mode='test')
     # set encodec model and discriminator model
@@ -409,7 +411,7 @@ def train(local_rank,world_size,config,tmp_file=None):
     TARGET_BETA = 0.01
     # number of warmup steps over half max_steps
     BETA_STEPS = 250
-    # BETA_STEPS = 250
+    # BETA_STEPS = 50
 
     beta, beta_step_val, beta_step_size, warmup_start = init_beta(config.common.max_epoch, TARGET_BETA, BETA_STEPS, BETA_WARMUP_START_PERC)
 
