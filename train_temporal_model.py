@@ -4,11 +4,13 @@ import torch.nn as nn
 import torchaudio
 import hydra
 from torchaudio.transforms import Spectrogram,MelSpectrogram
+import customAudioDataset as data
 
 # hydra breaks when this is included??
 # from frechet_audio_distance import FrechetAudioDistance
 
 from model import EncodecModel
+from utils import export_latents
 
 DEVICE = 'cpu'
 AUDIO_DIR = "/Users/adees/Code/neural_granular_synthesis/datasets/ESC-50_SeaWaves/audio/samples/5secs/small_train"
@@ -86,6 +88,20 @@ def convert_audio(wav: torch.Tensor, sr: int, target_sr: int, target_channels: i
 
 @hydra.main(config_path='config', config_name='config')
 def main(config):
+    
+    trainset = data.CustomAudioDataset(config=config)
+    testset = data.CustomAudioDataset(config=config,mode='test')
+
+    trainloader = torch.utils.data.DataLoader(
+        trainset,
+        batch_size=config.datasets.batch_size,
+        shuffle=False,
+        )
+    testloader = torch.utils.data.DataLoader(
+        testset,
+        batch_size=config.datasets.batch_size,
+        shuffle=False,
+        )
 
     model = EncodecModel._get_model(
         config.model.target_bandwidths, 
@@ -108,6 +124,11 @@ def main(config):
     # from torchinfo import summary
     # summary(model, (1, 2, 12000))
     # summary(model, (1, 2, 320*4))
+
+    train_latents,test_latents,= export_latents(model,trainloader,testloader,config.datasets.batch_size)
+
+    print(train_latents.shape)
+    print(img)
 
     with torch.no_grad():
 

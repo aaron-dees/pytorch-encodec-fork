@@ -231,4 +231,45 @@ def plot_audio_durations(duration_csv, boundaries, output_filename='audio_durati
     plt.savefig(output_filename, dpi=600)  
     # 显示图像  
     plt.show()
+
+    # Compute the latens
+def compute_latents(w_model, dataloader, batch_size):
+    # tmploader = torch.utils.data.DataLoader(dataloader.dataset, batch_size=batch_size, shuffle=False, drop_last=False)
+    dataset_latents = []
+    for idx,input_wav in enumerate(dataloader):
+        with torch.no_grad():
+            # warmup learning rate, warmup_epoch is defined in config file,default is 5
+            # input_wav = input_wav.contiguous().cuda() #[B, 1, T]: eg. [2, 1, 203760]
+            #TODO change back to cuda for gpu
+            input_wav = input_wav[0] #[B, 1, T]: eg. [2, 1, 203760]
+            # print(len(input_wav))
+            # print(input_wav[0].shape)
+            # print(input_wav[1])
+            # print(img)
+
+            output, frames = w_model(input_wav) #output: [B, 1, T]: eg. [2, 1, 203760] | loss_w: [1] 
+
+            # Get mu and logvar for VAE training
+            _,_,mu_tmp,logvar_tmp = frames[0]
+            mu = mu_tmp
+            logvar = logvar_tmp
+            for i in range(1,len(frames)):
+                _,_,mu_tmp,logvar_tmp = frames[i]
+                mu = torch.cat((mu, mu_tmp), dim = -2)
+                logvar = torch.cat((logvar, logvar_tmp), dim = -2)
+
+            # Reshape mu and logvar so average is taken across 
+            # mu = mu.reshape(mu.shape[0],mu.shape[1], mu.shape[2])
+            # logvar = logvar.reshape(logvar.shape[0],logvar.shape[1], logvar.shape[2])
+
+            dataset_latents.append(mu)
+    dataset_latents = torch.cat(dataset_latents,0)
+    print("--- Exported dataset sizes:\t",dataset_latents.shape)
+    return dataset_latents
+
+# Export the latents
+def export_latents(w_model, train_dataloader, test_dataloader, batch_size):
+    train_latents = compute_latents(w_model,train_dataloader, batch_size)
+    test_latents= compute_latents(w_model,test_dataloader, batch_size)
+    return train_latents,test_latents
     
