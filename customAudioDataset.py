@@ -5,6 +5,7 @@ import librosa
 import pandas as pd
 import torch
 import audioread
+import torchaudio
 
 import logging
 logger = logging.getLogger(__name__)
@@ -56,7 +57,7 @@ class CustomAudioDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         # waveform, sample_rate = torchaudio.load(self.audio_files.iloc[idx, :].values[0])
-        # """you can preprocess the waveform's sample rate to save time and memory"""
+        # # """you can preprocess the waveform's sample rate to save time and memory"""
         # if sample_rate != self.sample_rate:
         #     waveform = convert_audio(waveform, sample_rate, self.sample_rate, self.channels)
         waveform, sample_rate = self.get(idx)

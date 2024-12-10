@@ -11,10 +11,11 @@ from torchaudio.transforms import Spectrogram,MelSpectrogram
 from model import EncodecModel
 
 DEVICE = 'cpu'
-AUDIO_DIR = "/Users/adees/Code/neural_granular_synthesis/datasets/ESC-50_SeaWaves/audio/samples/5secs/small"
+AUDIO_DIR = "/Users/adees/Code/neural_granular_synthesis/datasets/ESC-50_SeaWaves/audio/samples/5secs/small_train"
 # LOAD_PATH = "/Users/adees/Code/encodec_tests/encodecModels/vae_encodecModel/bs16_cut48000_length0_epoch10000_lr0.0001_beta0.0001.pt"
-LOAD_PATH = "/Users/adees/Code/encodec_tests/encodecModels/vae_encodecModel/bs16_cut48000_length0_epoch10000_lr0.0001_seg0.25.pt"
+# LOAD_PATH = "/Users/adees/Code/encodec_tests/encodecModels/vae_encodecModel/bs16_cut48000_length0_epoch10000_lr0.0001_seg0.25.pt"
 # LOAD_PATH = "/Users/adees/Code/encodec_tests/encodecModels/vae_encodecModel/bs16_cut48000_length0_epoch10000_lr0.0001_beta0.01.pt"
+LOAD_PATH = "/Users/adees/Code/encodec_tests/encodecModels/vae_encodecModel/fsd_50k/bs16_cut48000_length0_epoch900_lr0.0001.pt"
 
 # frechet = FrechetAudioDistance(
 #     model_name="vggish",
@@ -103,6 +104,10 @@ def main(config):
 
     model.to(DEVICE)
     model.eval()
+
+    # from torchinfo import summary
+    # summary(model, (1, 2, 12000))
+    # summary(model, (1, 2, 320*4))
 
     with torch.no_grad():
 

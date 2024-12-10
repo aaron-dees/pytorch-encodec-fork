@@ -136,7 +136,7 @@ def main(config):
                 single_beta = frames[j][3][:,:,i:i+stride]
 
                 # Noise testing
-                single_latent += (torch.randn_like(single_latent)*2. - 1.)
+                # single_latent += (torch.randn_like(single_latent)*2. - 1.)
 
                 # single_tuple = (single_latent, single_scale)
                 single_tuple = (single_latent, single_scale, single_mu, single_beta)
