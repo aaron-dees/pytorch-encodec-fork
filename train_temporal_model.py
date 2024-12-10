@@ -5,12 +5,14 @@ import torchaudio
 import hydra
 from torchaudio.transforms import Spectrogram,MelSpectrogram
 import customAudioDataset as data
+from latent_dataloaders import make_latent_dataloaders
 
 # hydra breaks when this is included??
 # from frechet_audio_distance import FrechetAudioDistance
 
 from model import EncodecModel
 from utils import export_latents
+from customAudioDataset import collate_fn
 
 DEVICE = 'cpu'
 AUDIO_DIR = "/Users/adees/Code/neural_granular_synthesis/datasets/ESC-50_SeaWaves/audio/samples/5secs/small_train"
@@ -95,11 +97,13 @@ def main(config):
     trainloader = torch.utils.data.DataLoader(
         trainset,
         batch_size=config.datasets.batch_size,
+        collate_fn = collate_fn,
         shuffle=False,
         )
     testloader = torch.utils.data.DataLoader(
         testset,
         batch_size=config.datasets.batch_size,
+        collate_fn = collate_fn,
         shuffle=False,
         )
 
@@ -126,6 +130,8 @@ def main(config):
     # summary(model, (1, 2, 320*4))
 
     train_latents,test_latents,= export_latents(model,trainloader,testloader,config.datasets.batch_size)
+
+    train_latentloader,val_latentloader = make_latent_dataloaders(train_latents, test_latents, batch_size=config.datasets.batch_size ,num_workers=0)
 
     print(train_latents.shape)
     print(img)

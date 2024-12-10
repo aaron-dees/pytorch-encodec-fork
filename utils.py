@@ -241,7 +241,7 @@ def compute_latents(w_model, dataloader, batch_size):
             # warmup learning rate, warmup_epoch is defined in config file,default is 5
             # input_wav = input_wav.contiguous().cuda() #[B, 1, T]: eg. [2, 1, 203760]
             #TODO change back to cuda for gpu
-            input_wav = input_wav[0] #[B, 1, T]: eg. [2, 1, 203760]
+            input_wav = input_wav #[B, 1, T]: eg. [2, 1, 203760]
             # print(len(input_wav))
             # print(input_wav[0].shape)
             # print(input_wav[1])
