@@ -5,7 +5,7 @@ import torchaudio
 import hydra
 from torchaudio.transforms import Spectrogram,MelSpectrogram
 import customAudioDataset as data
-from latent_dataloaders import make_latent_dataloaders
+from latent_dataloaders import make_latent_dataloaders, create_dataset
 
 # hydra breaks when this is included??
 # from frechet_audio_distance import FrechetAudioDistance
@@ -13,6 +13,8 @@ from latent_dataloaders import make_latent_dataloaders
 from model import EncodecModel
 from utils import export_latents
 from customAudioDataset import collate_fn
+from recurrent_model import RNN_v2
+from datetime import datetime
 
 DEVICE = 'cpu'
 AUDIO_DIR = "/Users/adees/Code/neural_granular_synthesis/datasets/ESC-50_SeaWaves/audio/samples/5secs/small_train"
@@ -131,7 +133,109 @@ def main(config):
 
     train_latents,test_latents,= export_latents(model,trainloader,testloader,config.datasets.batch_size)
 
-    train_latentloader,val_latentloader = make_latent_dataloaders(train_latents, test_latents, batch_size=config.datasets.batch_size ,num_workers=0)
+    LOOKBACK = 150
+    X_train, y_train = create_dataset(train_latents, lookback=LOOKBACK)
+    test_X_train, test_y_train = create_dataset(test_latents, lookback=LOOKBACK)
+
+    X_train = X_train.reshape(-1, X_train.shape[2], X_train.shape[3])
+    y_train = y_train.reshape(-1, y_train.shape[2], y_train.shape[3])
+    test_X_train = test_X_train.reshape(-1, test_X_train.shape[2], test_X_train.shape[3])
+    test_y_train = test_y_train.reshape(-1, test_y_train.shape[2], test_y_train.shape[3])
+
+    LATENT_SIZE = 128
+    HIDDEN_SIZE = 128
+    NO_RNN_LAYERS = 1
+    # l_model = RNN_v1(LATENT_SIZE, HIDDEN_SIZE, LATENT_SIZE, NO_RNN_LAYERS)
+    l_model = RNN_v2(LATENT_SIZE, HIDDEN_SIZE, LATENT_SIZE, NO_RNN_LAYERS)
+    LEARNING_RATE = 0.01
+    optimizer = torch.optim.Adam(l_model.parameters(), lr=LEARNING_RATE)
+    # lr_scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, start_factor=1.0, end_factor=0.25, total_iters=3*EPOCHS/4)
+
+    loss_fn = nn.MSELoss()
+    # Note the batch size here 
+    
+    train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_train, y_train), shuffle=True, batch_size=config.datasets.batch_size)
+    test_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(test_X_train, test_y_train), shuffle=True, batch_size=config.datasets.batch_size)
+
+
+    for epoch in range(config.common.max_epoch):
+        l_model.train()
+        running_rmse = 0.0;
+        for X_batch, y_batch in train_loader:
+            y_pred = l_model(X_batch)
+            loss = loss_fn(y_pred, y_batch)
+            running_rmse += (loss.detach().numpy())
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+        # # Decay the learning rate
+        # lr_scheduler.step()
+        # new_lr = optimizer.param_groups[0]["lr"]
+        # Validation
+        if epoch % config.common.test_interval != 0:
+            continue
+        l_model.eval()
+        running_val_rmse = 0.0
+        with torch.no_grad():
+            for val_X_batch, val_y_batch in test_loader:
+                y_pred = l_model(val_X_batch)
+                running_val_rmse += (loss_fn(y_pred, val_y_batch))
+
+
+        # recon_latent = val_X_batch[0,:,:]
+        # # Add the next 10 samples on
+        # tmp = val_X_batch[0,:,:].unsqueeze(0)
+        # for i in range(0, y_pred.shape[0]):
+        #     tmp = l_model(tmp)
+        #     recon_latent = torch.cat((recon_latent, tmp[0,-1,:].unsqueeze(0)), dim=0)
+        #     # recon_latent = torch.cat((recon_latent, y_pred[i,-1,:].unsqueeze(0)), dim=0)
+
+        # print(recon_latent.shape)
+        # print(test_latents.shape)
+         
+        # sampled_seq_loss = loss_fn(recon_latent[LOOKBACK:, :] ,test_latents[0, LOOKBACK:, :])
+
+        train_rmse = running_rmse/len(train_loader)
+        val_rmse = running_val_rmse/len(test_loader)
+
+        print("Epoch %d: train RMSE %.16f, validation RMSE %.16f" % (epoch, train_rmse, val_rmse))
+        # print(f"Seq Loss: {sampled_seq_loss}")
+
+        #  # Early stopping Criteria
+        #  if sampled_seq_loss < 0.0001 and EARLY_STOPPING:
+        #      print("Stopped Early as test RMSE %.4f < 0.0001" % (sampled_seq_loss))
+        #      torch.save({
+        #              'epoch': epoch,
+        #              'model_state_dict': l_model.state_dict(),
+        #              'optimizer_state_dict': optimizer.state_dict(),
+        #              'loss': train_rmse,
+        #              }, f"{SAVE_MODEL_DIR}/latent_vae_latest_earlyStop.pt")
+        #      break
+
+
+        if (epoch) % config.common.save_interval == 0:
+            torch.save({
+                'epoch': epoch,
+                # 'warmup_start': warmup_start,
+                'model_state_dict': l_model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'loss': train_rmse,
+                }, f"./latent_vae_{DEVICE}_{config.common.max_epoch}epochs_{config.datasets.batch_size}batch_{epoch}epoch_{datetime.now()}.pt")
+            # Save as latest also
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': l_model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'loss': train_rmse,
+                }, f"./latent_vae_latest.pt")
+
+     # Save after final epoch
+    torch.save({
+         'epoch': epoch,
+         'model_state_dict': l_model.state_dict(),
+         'optimizer_state_dict': optimizer.state_dict(),
+         'loss': train_rmse,
+         }, f"./latent_vae_latest.pt")
 
     print(train_latents.shape)
     print(img)
