@@ -12,10 +12,13 @@ from model import EncodecModel
 
 DEVICE = 'cpu'
 AUDIO_DIR = "/Users/adees/Code/neural_granular_synthesis/datasets/ESC-50_SeaWaves/audio/samples/5secs/small_train"
-# LOAD_PATH = "/Users/adees/Code/encodec_tests/encodecModels/vae_encodecModel/bs16_cut48000_length0_epoch10000_lr0.0001_beta0.0001.pt"
+# AUDIO_DIR = "/Users/adees/Code/neural_granular_synthesis/datasets/EpidemicSound/water_wave"
+# AUDIO_DIR = "/Users/adees/Code/neural_granular_synthesis/datasets/fsd-50k/single"
+LOAD_PATH = "/Users/adees/Code/encodec_tests/encodecModels/vae_encodecModel/bs16_cut48000_length0_epoch10000_lr0.0001_beta0.0001.pt"
 # LOAD_PATH = "/Users/adees/Code/encodec_tests/encodecModels/vae_encodecModel/bs16_cut48000_length0_epoch10000_lr0.0001_seg0.25.pt"
 # LOAD_PATH = "/Users/adees/Code/encodec_tests/encodecModels/vae_encodecModel/bs16_cut48000_length0_epoch10000_lr0.0001_beta0.01.pt"
-LOAD_PATH = "/Users/adees/Code/encodec_tests/encodecModels/vae_encodecModel/fsd_50k/bs16_cut48000_length0_epoch900_lr0.0001.pt"
+# LOAD_PATH = "/Users/adees/Code/encodec_tests/encodecModels/vae_encodecModel/fsd_50k/bs16_cut48000_length0_epoch900_lr0.0001.pt"
+# LOAD_PATH = "/Users/adees/Code/encodec_tests/encodecModels/vae_encodecModel/es_seaWaves/bs16_cut48000_length0_epoch100_lr0.0001.pt"
 
 # frechet = FrechetAudioDistance(
 #     model_name="vggish",
@@ -112,6 +115,8 @@ def main(config):
     with torch.no_grad():
 
         full_audio, sr_orig = torchaudio.load(AUDIO_DIR+"/1-39901-A-11.wav")
+        # full_audio, sr_orig = torchaudio.load(AUDIO_DIR+"/audio.wav")
+        # full_audio, sr_orig = torchaudio.load(AUDIO_DIR+"/ES_Waves Splashing On Rocks 02 - Epidemic Sound.wav")
         # full_audio, sr_orig = torchaudio.load("/Users/adees/Code/pytorch-encodec-fork/data/noisebandComparison/real/audio.wav")
         input_wav = convert_audio(full_audio, sr_orig, model.sample_rate, model.channels)
         input_wav = input_wav.unsqueeze(0)
