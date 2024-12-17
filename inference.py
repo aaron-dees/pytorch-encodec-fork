@@ -11,9 +11,11 @@ from torchaudio.transforms import Spectrogram,MelSpectrogram
 from model import EncodecModel
 
 DEVICE = 'cpu'
-AUDIO_DIR = "/Users/adees/Code/neural_granular_synthesis/datasets/ESC-50_SeaWaves/audio/samples/5secs/small"
+# AUDIO_DIR = "/Users/adees/Code/neural_granular_synthesis/datasets/ESC-50_SeaWaves/audio/samples/5secs/small_train"
+# AUDIO_DIR = "/Users/adees/Code/neural_granular_synthesis/datasets/EpidemicSound/water_wave"
+AUDIO_DIR = "/Users/adees/Code/neural_granular_synthesis/datasets/thunderstorm_noisebandnet/audio"
 # LOAD_PATH = "/Users/adees/Code/encodec_tests/encodecModels/vae_encodecModel/bs16_cut48000_length0_epoch10000_lr0.0001_beta0.0001.pt"
-LOAD_PATH = "/Users/adees/Code/encodec_tests/encodecModels/vae_encodecModel/bs16_cut48000_length0_epoch10000_lr0.0001_seg0.25.pt"
+LOAD_PATH = "/Users/adees/Code/encodec_tests/encodecModels/vae_encodecModel/es_seaWaves/1secSamples_bs16_cut48000_length0_epoch140_lr0.0003.pt"
 # LOAD_PATH = "/Users/adees/Code/encodec_tests/encodecModels/vae_encodecModel/bs16_cut48000_length0_epoch10000_lr0.0001_beta0.01.pt"
 
 # frechet = FrechetAudioDistance(
@@ -106,7 +108,9 @@ def main(config):
 
     with torch.no_grad():
 
-        full_audio, sr_orig = torchaudio.load(AUDIO_DIR+"/1-39901-A-11.wav")
+        # full_audio, sr_orig = torchaudio.load(AUDIO_DIR+"/1-39901-A-11.wav")
+        # full_audio, sr_orig = torchaudio.load(AUDIO_DIR+"/ES_Waves Sweeping Over Rocks, Calm, Lapping, Scandinavian Archipelago - Epidemic Sound.wav")
+        full_audio, sr_orig = torchaudio.load(AUDIO_DIR+"/audio.wav")
         # full_audio, sr_orig = torchaudio.load("/Users/adees/Code/pytorch-encodec-fork/data/noisebandComparison/real/audio.wav")
         input_wav = convert_audio(full_audio, sr_orig, model.sample_rate, model.channels)
         input_wav = input_wav.unsqueeze(0)
