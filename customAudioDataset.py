@@ -14,7 +14,7 @@ from utils import convert_audio
 
 
 class CustomAudioDataset(torch.utils.data.Dataset):
-    def __init__(self, config, transform=None,mode='train'):
+    def __init__(self, config, transform=None,mode='train',inference=False):
         assert mode in ['train', 'test'], 'dataset mode must be train or test'
         if mode == 'train':
             self.audio_files = pd.read_csv(config.datasets.train_csv_path,on_bad_lines='skip')
@@ -25,6 +25,7 @@ class CustomAudioDataset(torch.utils.data.Dataset):
         self.tensor_cut = config.datasets.tensor_cut
         self.sample_rate = config.model.sample_rate
         self.channels = config.model.channels
+        self.inference = inference
 
     def __len__(self):
         return self.fixed_length if self.fixed_length and len(self.audio_files) > self.fixed_length else len(self.audio_files)  
@@ -67,7 +68,10 @@ class CustomAudioDataset(torch.utils.data.Dataset):
 
         if self.tensor_cut > 0:
             if waveform.size()[1] > self.tensor_cut:
-                start = random.randint(0, waveform.size()[1]-self.tensor_cut-1) # random start point
+                if(self.inference==False):
+                    start = random.randint(0, waveform.size()[1]-self.tensor_cut-1) # random start point
+                else:
+                    start = 0 # random at 0
                 waveform = waveform[:, start:start+self.tensor_cut] # cut tensor
                 return waveform, sample_rate
             else:
