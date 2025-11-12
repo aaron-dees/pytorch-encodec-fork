@@ -176,18 +176,18 @@ def main(config):
 
     print("Exporting Latents...")
 
-    train_latents, test_latents = export_latents(w_model, wav_trainloader, wav_testloader, config.datasets.batch_size, DEVICE)
+    train_latents, test_latents, train_scales, test_scales = export_latents(w_model, wav_trainloader, wav_testloader, config.datasets.batch_size, device)
     VAE_DIMS = train_latents.shape[1]
 
     train_data_loader = torch.utils.data.DataLoader(
-        train_latents,
+        torch.utils.data.TensorDataset(train_latents, train_scales),
         shuffle=True,
         batch_size=config.datasets.batch_size,
         # num_workers=0,
         # pin_memory=False,
     )
     val_data_loader = torch.utils.data.DataLoader(
-        test_latents,
+        torch.utils.data.TensorDataset(test_latents, test_scales),
         shuffle=True,
         batch_size=config.datasets.batch_size,
         # num_workers=0,
@@ -274,11 +274,12 @@ def main(config):
 
         for step, batch in enumerate(train_data_loader):
             # print(len(batch))
-            batch_rave_tensor = batch.to(device)
-            print("Batch Size: ", batch_rave_tensor.shape)
+            batch_tensor = batch[0].to(device)
+            scale_tensor = batch[1].to(device)
+            # print("Batch Size: ", batch_tensor.shape)
+            # print("Scale Size: ", scale_tensor.shape)
 
-            loss = model(batch_rave_tensor)
-            print(loss.shape)
+            loss = model(batch_tensor)
 
             train_loss += loss.item()
 
@@ -299,9 +300,10 @@ def main(config):
 
             val_loss = 0
             for batch in val_data_loader:
-                batch_rave_tensor = batch.to(device)
+                batch_tensor = batch[0].to(device)
+                scale_tensor = batch[1].to(device)
 
-                loss = model(batch_rave_tensor)
+                loss = model(batch_tensor)
 
                 val_loss += loss.item()
 
@@ -316,28 +318,29 @@ def main(config):
                 noise = noise * config.diffusion.temperature
                 diff = model.sample(noise[:,:,:256], num_steps=config.diffusion.scheduler_steps, show_progress=True)
 
-                frames = diff.permute(0,2,1)
+                # frames = diff.permute(0,2,1)
                 # frames = diff
-                batch_rave_tensor = batch_rave_tensor.permute(0,2,1)
+                # batch_tensor = batch_tensor.permute(0,2,1)
                 # print(frames)
 
                 print("Reconstructing Audio")
                 # print(batch_rave_tensor.shape)
-                pred_encodec_frames = reconstruct_encodec_frames(diff)
-                target_encodec_frames = reconstruct_encodec_frames(batch_rave_tensor.permute(0,2,1))
+                pred_encodec_frames = reconstruct_encodec_frames(diff, scale_tensor)
+                target_encodec_frames = reconstruct_encodec_frames(batch_tensor, scale_tensor)
                 pred_audio = w_model.decode(pred_encodec_frames)
                 target_audio = w_model.decode(target_encodec_frames)
-                torchaudio.save(f'./recon.wav', pred_audio[0].cpu(), w_model.sample_rate, channels_first=True)
-                torchaudio.save(f'./orig.wav', target_audio[0].cpu(), w_model.sample_rate, channels_first=True)
+                # torchaudio.save(f'./recon.wav', pred_audio[0].cpu(), w_model.sample_rate, channels_first=True)
+                # torchaudio.save(f'./orig.wav', target_audio[0].cpu(), w_model.sample_rate, channels_first=True)
+                writer.add_audio("Recon/GenLatent", pred_audio[0], sample_rate=w_model.sample_rate, global_step=i+1)
+                writer.add_audio("Recon/OrigLatent", target_audio[0], sample_rate=w_model.sample_rate, global_step=i+1)
 
-                writer.add_audio("Recon/GenLatent", pred_audio, sample_rate=w_model.sample_rate, global_step=i+1)
-                writer.add_audio("Recon/OrigLatent", target_audio, sample_rate=w_model.sample_rate, global_step=i+1)
+                # print(img)
 
                 import matplotlib.pyplot as plt
                 from sklearn.decomposition import PCA
                 # Use first batch of validation for plotting
-                target_seq = batch_rave_tensor[0].cpu().numpy()
-                pred_seq = frames[0].cpu().numpy()
+                target_seq = batch_tensor.permute(0,2,1)[0].cpu().numpy()
+                pred_seq = diff.permute(0,2,1)[0].cpu().numpy()
                 all_seq = np.vstack([target_seq, pred_seq])
                 pca = PCA(n_components=3)
                 Zp = pca.fit_transform(all_seq)

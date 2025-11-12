@@ -6,6 +6,7 @@ import pandas as pd
 import torch
 import audioread
 import torchaudio
+import soundfile as sf
 
 import logging
 logger = logging.getLogger(__name__)
@@ -57,7 +58,15 @@ class CustomAudioDataset(torch.utils.data.Dataset):
         return waveform, sample_rate
 
     def __getitem__(self, idx):
-        waveform, sample_rate = torchaudio.load(self.audio_files.iloc[idx, :].values[0])
+        # waveform, sample_rate = torchaudio.load(self.audio_files.iloc[idx, :].values[0])
+        audio_path = self.audio_files.iloc[idx, :].values[0]
+        audio_np, sample_rate = sf.read(audio_path, dtype='float32')
+        # convert to tensor with shape [channels, samples]
+        if audio_np.ndim == 1:
+            waveform = torch.from_numpy(audio_np).unsqueeze(0)
+        else:
+            waveform = torch.from_numpy(audio_np.T)
+        waveform = waveform.float()
         """you can preprocess the waveform's sample rate to save time and memory"""
         if sample_rate != self.sample_rate:
             waveform = convert_audio(waveform, sample_rate, self.sample_rate, self.channels)

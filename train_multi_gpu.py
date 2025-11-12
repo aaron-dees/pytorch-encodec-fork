@@ -233,8 +233,10 @@ def test(epoch, model, disc_model, testloader, config, writer):
         output = output.squeeze(0)
         # summarywriter can't log stereo files 😅 so just save examples
         sp = Path(config.checkpoint.save_folder)
-        torchaudio.save(sp/f'GT.wav', input_wav.cpu(), config.model.sample_rate)
-        torchaudio.save(sp/f'Reconstruction.wav', output.cpu(), config.model.sample_rate)
+        writer.add_audio("Recon/GenLatent", input_wav[0], sample_rate=model.sample_rate, global_step=epoch)
+        writer.add_audio("Recon/OrigLatent", output[0], sample_rate=model.sample_rate, global_step=epoch)
+        # torchaudio.save(sp/f'GT.wav', input_wav.cpu(), config.model.sample_rate)
+        # torchaudio.save(sp/f'Reconstruction.wav', output.cpu(), config.model.sample_rate)
 
 def train(local_rank,world_size,config,tmp_file=None):
     """train main function."""
@@ -410,8 +412,8 @@ def train(local_rank,world_size,config,tmp_file=None):
     # BETA_WARMUP_START_PERC = 0.001
     TARGET_BETA = 0.01
     # number of warmup steps over half max_steps
-    BETA_STEPS = 250
-    # BETA_STEPS = 50
+    # BETA_STEPS = 250
+    BETA_STEPS = 50
 
     beta, beta_step_val, beta_step_size, warmup_start = init_beta(config.common.max_epoch, TARGET_BETA, BETA_STEPS, BETA_WARMUP_START_PERC)
 
