@@ -180,14 +180,14 @@ def main(config):
     VAE_DIMS = train_latents.shape[1]
 
     train_data_loader = torch.utils.data.DataLoader(
-        torch.utils.data.TensorDataset(train_latents, train_scales),
+        torch.utils.data.TensorDataset(train_latents),
         shuffle=True,
         batch_size=config.datasets.batch_size,
         # num_workers=0,
         # pin_memory=False,
     )
     val_data_loader = torch.utils.data.DataLoader(
-        torch.utils.data.TensorDataset(test_latents, test_scales),
+        torch.utils.data.TensorDataset(test_latents),
         shuffle=True,
         batch_size=config.datasets.batch_size,
         # num_workers=0,
@@ -275,7 +275,6 @@ def main(config):
         for step, batch in enumerate(train_data_loader):
             # print(len(batch))
             batch_tensor = batch[0].to(device)
-            scale_tensor = batch[1].to(device)
             # print("Batch Size: ", batch_tensor.shape)
             # print("Scale Size: ", scale_tensor.shape)
 
@@ -301,7 +300,6 @@ def main(config):
             val_loss = 0
             for batch in val_data_loader:
                 batch_tensor = batch[0].to(device)
-                scale_tensor = batch[1].to(device)
 
                 loss, val_pred, val_target = model(batch_tensor)
 
