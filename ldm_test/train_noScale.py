@@ -132,7 +132,29 @@ def main(config):
     # val_data_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True)
 
     set_seed(664)
-    
+
+    # load latent stats
+    stats_path = os.path.join(config.diffusion.save_out_path, f"/home/CAMPUS/d22127229/code/github/encodec-pytorch/ldm_test/latent_stats.npz")
+    if os.path.exists(stats_path):
+        stats = np.load(stats_path)
+        latent_means = torch.from_numpy(stats['means']).float()
+        latent_stds = torch.from_numpy(stats['stds']).float()
+        # guard against zero stds
+        latent_stds = torch.clamp(latent_stds, min=1e-12)
+        # move to device for later use
+        latent_means = latent_means.to(device)
+        latent_stds = latent_stds.to(device)
+        # reshape to (1, C, 1) so they broadcast over batch tensors of shape [B, C, T]
+        if latent_means.dim() == 1:
+            latent_means = latent_means.view(1, -1, 1)
+        if latent_stds.dim() == 1:
+            latent_stds = latent_stds.view(1, -1, 1)
+        print(f"Loaded latent statistics from: {stats_path}")
+    else:
+        latent_means = None
+        latent_stds = None
+        print(f"Latent statistics file not found at: {stats_path} - continuing without normalization")
+
     trainset = data.CustomAudioDataset(config=config)
     testset = data.CustomAudioDataset(config=config,mode='test')
 
@@ -277,6 +299,10 @@ def main(config):
             batch_tensor = batch[0].to(device)
             # print("Batch Size: ", batch_tensor.shape)
             # print("Scale Size: ", scale_tensor.shape)
+            #standardize if stats are available
+            if latent_means is not None and latent_stds is not None:
+                # latent_means/stds are shaped (1, C, 1) so they broadcast over (B, C, T)
+                batch_tensor = (batch_tensor - latent_means) / latent_stds
 
             loss, _, _ = model(batch_tensor)
 
@@ -300,6 +326,9 @@ def main(config):
             val_loss = 0
             for batch in val_data_loader:
                 batch_tensor = batch[0].to(device)
+                if latent_means is not None and latent_stds is not None:
+                    # latent_means/stds are shaped (1, C, 1) so they broadcast over (B, C, T)
+                    batch_tensor = (batch_tensor - latent_means) / latent_stds
 
                 loss, val_pred, val_target = model(batch_tensor)
 
@@ -314,12 +343,19 @@ def main(config):
             if i % config.diffusion.view_analysis_interval == 0:
                 noise = torch.randn(1, VAE_DIMS, sample_len).to(device)
                 noise = noise * config.diffusion.temperature
-                diff = model.sample(noise[:,:,:128], num_steps=config.diffusion.scheduler_steps, show_progress=True)
+                diff = model.sample(noise[:,:,:256], num_steps=config.diffusion.scheduler_steps, show_progress=True)
 
                 # frames = diff.permute(0,2,1)
                 # frames = diff
                 # batch_tensor = batch_tensor.permute(0,2,1)
                 # print(frames)
+
+                #scale the latents back if stats are available
+                if latent_means is not None and latent_stds is not None:
+                    # latent_means/stds already in (1, C, 1) shape, so use directly to denormalize
+                    diff = diff * latent_stds + latent_means
+                    val_pred = val_pred * latent_stds + latent_means
+                    batch_tensor = batch_tensor * latent_stds + latent_means
 
                 print("Reconstructing Audio")
                 # print(batch_rave_tensor.shape)
