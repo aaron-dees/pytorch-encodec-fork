@@ -14,14 +14,14 @@ def compute_latents(w_model, dataloader, batch_size, device):
             #save input wave
             sf.write("./input_wave.wav", input_wav[0,0,:].cpu().numpy(), samplerate=w_model.sample_rate)
             # check that input is 3 secs long
-            if input_wav.shape[-1] != w_model.sample_rate * 3:
+            if input_wav.shape[-1] != w_model.sample_rate * 5:
                 print("Skipping sample with wrong length: ", input_wav.shape[-1])
                 continue
             # ---------- Run Model ----------
             frames = w_model.encode(input_wav)
-            audio = w_model.decode(frames)
+            # audio = w_model.decode(frames)
 
-            sf.write("./output_wave.wav", audio[0,0,:].cpu().numpy(), samplerate=w_model.sample_rate)
+            # sf.write("./output_wave.wav", audio[0,0,:].cpu().numpy(), samplerate=w_model.sample_rate)
             # print(img)
             z_tmp,scale_tmp,mu_tmp,logvar_tmp = frames[0]
             z = z_tmp
@@ -48,7 +48,7 @@ def compute_latents(w_model, dataloader, batch_size, device):
     # labels not so important now, but will be in future
     # print("--- Exported dataset sizes:\t",dataset_latents.shape,dataset_labels.shape)
     print("--- Exported dataset sizes:\t", dataset_latents.shape)
-    return dataset_latents[:,:,:128], scale_list
+    return dataset_latents[:,:,:256], scale_list
     # return dataset_latents
     # return dataset_latents,dataset_labels
 

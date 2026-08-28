@@ -377,7 +377,7 @@ def main(config):
                 from sklearn.decomposition import PCA
                 # Use first batch of validation for plotting
                 target_seq = batch_tensor.permute(0,2,1)[0].cpu().numpy()
-                pred_seq = diff.permute(0,2,1)[0].cpu().numpy()
+                pred_seq = val_pred.permute(0,2,1)[0].cpu().numpy()
                 all_seq = np.vstack([target_seq, pred_seq])
                 pca = PCA(n_components=3)
                 Zp = pca.fit_transform(all_seq)

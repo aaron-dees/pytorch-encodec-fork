@@ -68,8 +68,9 @@ diffusion:
   epochs: 25000
   save_interval: 500
   temperature: 1.0
-  view_analysis_interval: 50
-  waveform_model_path: "/Users/adees/Code/saved_models/paperModels/all/vae_encodec_model_16latent.pt"
+  view_analysis_interval: 10
+  scale_required: False
+  waveform_model_path: "/home/CAMPUS/d22127229/code/github/encodec-pytorch/saved_models/vae_encodec_model_streamable_128.pt"
 
 
 
